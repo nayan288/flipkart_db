@@ -6,6 +6,8 @@ from functions import yearsincomebargraph,totalofcustomers
 import matplotlib
 matplotlib.use("Agg")    
 import matplotlib.pyplot as plt
+import os
+
 connection = mysql.connector.connect(
     host="localhost",
     username= "nayanuser",
@@ -196,7 +198,6 @@ ORDER_FIELDS ={
 }
 
 
-import os
 
 CHART_DIR = os.path.join(app.static_folder, "images")
 os.makedirs(CHART_DIR, exist_ok=True)
@@ -243,6 +244,37 @@ def empanalyze():
         ts=int(time.time())
     )     
 
+
+
+
+CHART_DIR = os.path.join(app.static_folder, "images")
+os.makedirs(CHART_DIR, exist_ok=True)
+
+def make_chart(rows, fieldtype):
+    labels = [str(r[0]) for r in rows]
+    totals = [r[1] for r in rows]
+
+    fig, ax = plt.subplots(figsize=(7, max(3, 0.45 * len(labels) + 1)))
+    colors = plt.cm.viridis([i / max(len(labels) - 1, 1) for i in range(len(labels))])
+    bars = ax.barh(labels, totals, color=colors)
+
+    ax.invert_yaxis()
+    ax.bar_label(bars, padding=4)
+    ax.set_xlabel("Employees")
+    ax.set_title(f"Employees by {ALLOWED_FIELDS[fieldtype]}", fontweight="bold")
+    ax.spines[["top", "right"]].set_visible(False)
+    fig.tight_layout()
+
+    fig.savefig(os.path.join(CHART_DIR, f"analysis_{fieldtype}.png"), dpi=150)
+    plt.close(fig)
+    return f"images/analysis_{fieldtype}.png"
+
+
+ORDER_FIELDS ={
+    "payment_status":"Payment Status",
+    "status":"Status"
+}
+
 @app.route("/orderanalyze",methods=["GET","POST"])
 def orderanalyze():
     rows = image = fieldtype = None
@@ -265,6 +297,70 @@ def orderanalyze():
         ts=int(time.time())
     )  
 
+
+
+
+ALLOWED_FIELDS = {
+    "warehouse_name": "Warehouse name",
+    "status": "Status",
+    "courier_partner": "Courier Partner",
+}
+
+
+
+CHART_DIR = os.path.join(app.static_folder, "images")
+os.makedirs(CHART_DIR, exist_ok=True)
+
+def make_chart(rows, fieldtype):
+    labels = [str(r[0]) for r in rows]
+    totals = [r[1] for r in rows]
+
+    fig, ax = plt.subplots(figsize=(7, max(3, 0.45 * len(labels) + 1)))
+    colors = plt.cm.viridis([i / max(len(labels) - 1, 1) for i in range(len(labels))])
+    bars = ax.barh(labels, totals, color=colors)
+
+    ax.invert_yaxis()
+    ax.bar_label(bars, padding=4)
+    ax.set_xlabel("Warehouses")
+    ax.set_title(f"Warehouses by {ALLOWED_FIELDS[fieldtype]}", fontweight="bold")
+    ax.spines[["top", "right"]].set_visible(False)
+    fig.tight_layout()
+
+    fig.savefig(os.path.join(CHART_DIR, f"W_analysis_{fieldtype}.png"), dpi=150)
+    plt.close(fig)
+    return f"images/W_analysis_{fieldtype}.png"    
+
+@app.route("/warehouses",methods=["GET","POST"])
+def warehouses():
+    rows = image = fieldtype = None
+
+    if request.method == "POST":
+        fieldtype = request.form.get("fieldtype")
+
+        if fieldtype in ALLOWED_FIELDS:
+            query = f"""
+                WITH tb1 AS (
+                    SELECT w.warehouse_id, w.warehouse_name,
+                           s.courier_partner, s.status
+                    FROM warehouses w
+                    JOIN shipments s ON w.warehouse_id = s.warehouse_id
+                )
+                SELECT {fieldtype}, COUNT(*)
+                FROM tb1
+                GROUP BY {fieldtype}
+            """
+            cursor.execute(query)
+            rows = cursor.fetchall()
+            image = make_chart(rows, fieldtype)
+                
+    return render_template(
+        "warehouseanalyze.html",
+        rows=rows,
+        selected=fieldtype,
+        image=image,
+        fields=ALLOWED_FIELDS,
+        ts=int(time.time())
+    ) 
 
 
 
